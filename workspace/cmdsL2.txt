@@ -1,0 +1,8 @@
+cd $HOME/embedded-linux-stm32mp2-labs/toolchain
+sudo apt -y install build-essential git autoconf bison flex texinfo help2man gawk libtool-bin libncurses5-dev unzip gettext python3 rsync
+git clone https://github.com/crosstool-ng/crosstool-ng
+cd crosstool-ng/
+git checkout crosstool-ng-1.28.0
+./bootstrap
+./configure --enable-local
+make
