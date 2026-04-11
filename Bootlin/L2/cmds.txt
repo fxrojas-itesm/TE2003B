@@ -13,5 +13,4 @@ export PATH=${PATH}:${HOME}/x-tools/aarch64-te2003b-linux-musl/bin/
 aarch64-linux-gcc -o hello hello.c
 file hello
 sudo apt -y install qemu-user
-qemu-aarch64 -L ${HOME}/x-tools/aarch64-te2003b-linux
--musl/aarch64-te2003b-linux-musl/sysroot hello
+qemu-aarch64 -L ${HOME}/x-tools/aarch64-te2003b-linux-musl/aarch64-te2003b-linux-musl/sysroot hello
