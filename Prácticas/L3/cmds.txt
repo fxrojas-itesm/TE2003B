@@ -1,0 +1,11 @@
+# Download and install latest version of _SD Card Formatter_ from here: https://www.sdcard.org/downloads/formatter/
+# Download and install latest version of _usbipd-win_: https://github.com/dorssel/usbipd-win/releases
+# Download and install latest version of _WSL USB Manager_: https://github.com/nickbeth/wsl-usb-manager/releases
+cd ${HOME}/embedded-linux-stm32mp2-labs/bootloader/
+# Introduce the microSD card from the box into the _STM32MP257F-DK_ board (257F board) to PC via _USB PWR STLINK_ connector. Confirm COM ports on Device Manager.
+ls -lat /dev/ | grep ttyACM*
+sudo apt install picocom
+sudo adduser ${USER} dialout
+# Close and reopen WSL terminal. Verify 257F board is still attached to WSL.
+picocom -b 115200 /dev/ttyACM0
+

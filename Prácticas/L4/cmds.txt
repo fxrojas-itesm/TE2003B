@@ -1,0 +1,7 @@
+cd ${HOME} && mkdir -p stm32mp257f-openstlinux && cd stm32mp257f-openstlinux
+wget 
+sudo apt-get update && sudo apt-get install -y gawk wget git git-lfs diffstat unzip texinfo gcc-multilib  chrpath socat cpio python3 python3-pip python3-pexpect xz-utils debianutils iputils-ping python3-git python3-jinja2 libsdl1.2-dev pylint xterm bsdmainutils libusb-1.0-0 bison flex libssl-dev libgmp-dev libmpc-dev lz4 zstd libegl1-mesa-dev build-essential libncurses-dev libyaml-dev coreutils bsdmainutils sed curl bc lrzsz corkscrew cvs subversion mercurial nfs-common nfs-kernel-server libarchive-zip-perl dos2unix texi2html libxml2-utils gdisk
+./scripts/create_sdcard_from_flashlayout.sh flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-optee.tsv
+sudo dd if=dd if=FlashLayout_sdcard_stm32mp257f-dk-optee.raw of=/dev/sdX bs=8M conv=fdatasync status=progress
+# Connect another USB-C cable to the board
+ssh root@192.168.7.1

@@ -1,0 +1,5 @@
+https://wiki.st.com/stm32mpu/wiki/STM32MP25_microprocessor
+https://wiki.st.com/stm32mpu/wiki/Category:STM32_MPU_microprocessor_devices
+https://wiki.st.com/stm32mpu/wiki/STM32MP25_Discovery_kits_-_Starter_Package
+https://wiki.st.com/stm32mpu/wiki/OpenSTLinux_architecture_overview
+https://wiki.st.com/stm32mpu/wiki/STM32MP25_peripherals_overview_for_A35-TD_flavor
