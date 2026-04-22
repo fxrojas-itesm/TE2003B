@@ -5,5 +5,11 @@ tar -xaf FLASH-stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.tar.gz
 cd stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2/
 ./scripts/create_sdcard_from_flashlayout.sh flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-optee.tsv
 sudo dd if=FlashLayout_sdcard_stm32mp257f-dk-optee.raw of=/dev/sdX bs=8M conv=fdatasync status=progress
+cd ${HOME}/stm32mp257f-openstlinux/
+mv ../SDK-x86_64-stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.tar.gz .
+tar -xaf SDK-x86_64-stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.tar.gz
+cd stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sdk/
+./st-image-weston-openstlinux-weston-stm32mp2.rootfs-x86_64-toolchain-5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.sh
+
 # Connect another USB-C cable to the board
 ssh root@192.168.7.1
