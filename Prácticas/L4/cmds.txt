@@ -14,6 +14,7 @@ cd stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sdk/
 cd /opt/st/stm32mp2/5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sysroots/x86_64-ostl_sdk-linux/usr/bin/aarch64-ostl-linux
 pwd
 nano ~/.bashrc
+source ~/.bashrc
 # Anexar lo siguiente al final: export PATH=${PATH}:/opt/st/stm32mp2/5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sysroots/x86_64-ostl_sdk-linux/usr/bin/aarch64-ostl-linux
 cd ${HOME}
 aarch64-ostl-linux-gcc --version
