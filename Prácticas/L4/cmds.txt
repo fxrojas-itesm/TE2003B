@@ -9,15 +9,19 @@ cd ${HOME}/stm32mp257f-openstlinux/
 mv ../SDK-x86_64-stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.tar.gz .
 tar -xaf SDK-x86_64-stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.tar.gz
 cd stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sdk/
- chmod +x st-image-weston-openstlinux-weston-stm32mp2.rootfs-x86_64-toolchain-5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.sh
+chmod +x st-image-weston-openstlinux-weston-stm32mp2.rootfs-x86_64-toolchain-5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.sh
 ./st-image-weston-openstlinux-weston-stm32mp2.rootfs-x86_64-toolchain-5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.sh
-cd /opt/st/stm32mp2/5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sysroots/x86_64-ostl_sdk-linux/usr/bin/aarch64-ostl-linux
-pwd
 nano ~/.bashrc
+# Anexar lo siguiente al final: source /opt/st/stm32mp2/5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/environment-setup-cortexa35-ostl-linux
 source ~/.bashrc
-# Anexar lo siguiente al final: export PATH=${PATH}:/opt/st/stm32mp2/5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sysroots/x86_64-ostl_sdk-linux/usr/bin/aarch64-ostl-linux
-cd ${HOME}
-aarch64-ostl-linux-gcc --version
+# Close current terminal and open a new one
+
+cd ${HOME} && mkdir -p stm32mp257f-dev && cd stm32mp257f-dev
+# Create a program that prints "Hello World!"
+${CC} -o hello.x hello.c
+scp hello.x root@192.168.7.1:~
 
 # Connect another USB-C cable to the board
+# Open another terminal and run
 ssh root@192.168.7.1
+./hello.x
