@@ -1,12 +1,5 @@
-pushd sources/ostl-linux/optee-os-stm32mp-4.0.0-stm32mp-r3-r0/deploy/
-cp -f /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Starter-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2/fip/fip-stm32mp257f-dk-optee-sdcard.bin .
-fiptool update --tos-fw tee-header_v2-stm32mp257f-dk-optee.bin   --tos-fw-extra1 tee-pager_v2-stm32mp257f-dk-optee.bin --tos-fw-extra2 tee-pageable_v2-stm32mp257f-dk-optee.bin fip-stm32mp257f-dk-optee-sdcard.bin
 scp fip-stm32mp257f-dk-optee-sdcard.bin root@192.168.7.1:/tmp/
-popd
-
-pushd sources/ostl-linux/linux-stm32mp-6.6.116-stm32mp-r3-r0/build/
-scp arch/arm64/boot/dts/st/stm32mp257f-dk.dtb root@192.168.7.1:/boot/
-popd
+scp stm32mp257f-dk.dtb root@192.168.7.1:/boot/
 
 # On target:
 
@@ -17,8 +10,6 @@ dd if=/tmp/fip-stm32mp257f-dk-optee-sdcard.bin of=/dev/${SD_DRIVE}p6 bs=1M conv=
 sync
 reboot
 
-# Verify RIF is working
-killall gpioset
-gpioset -c gpiochip9 8=0 
+gpioset -c gpiochip9 8=1 
 # <CTRL>+C
 gpioget -c gpiochip9 8
