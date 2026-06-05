@@ -1,0 +1,18 @@
+## The following method copies the OpenAMP Python-based application and runs it on the 257F-DK board. It reads information coming from the microcontroller.
+
+##  Pre-requisites
+## 1) Starter-package image flashed on microSD card with re-flashed bootloader
+## 2) SSH-enabled connection to STM32MP257F-DK board
+## 3) All files on current folder downloaded locally. Next steps under host consider terminal is located on that folder. 
+
+
+## The following commmands should be entered on the host (PC)system
+
+# Copying required files from host to target board
+scp A35_Demo_Reto.py root@192.168.7.1:~
+
+
+## The following commmands should be entered on the target (257F-DK)system
+
+# Identifying which remote processor is the CM33, then stopping execution of the CM33, flashing CM33_Demo_Reto.elf binary and finally restarting execution of CM33 with the re-flashed application
+python3 A35_Demo_Reto.py

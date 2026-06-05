@@ -1,0 +1,19 @@
+## The following method flashes the resulting Zephyr-based binary that read the GPS, VL53L0x and BMP280 running on the CM33 MCU 
+
+
+##  Pre-requisites
+## 1) Starter-package image flashed on microSD card with re-flashed bootloader
+## 2) SSH/Serial-enabled connection to STM32MP257F-DK board
+## 3) All files on current folder downloaded locally. Next steps under host consider terminal is located on that folder. 
+
+
+## The following commmands should be entered on the host (PC)system
+
+# Copying required files from host to target board
+scp CM33_Demo_Reto.elf root@192.168.7.1:/lib/firmware
+
+
+## The following commmands should be entered on the target (257F-DK)system
+
+# Identifying which remote processor is the CM33, then stopping execution of the CM33, flashing CM33_Demo_Reto.elf binary and finally restarting execution of CM33 with the re-flashed application
+RP=$(cat /sys/class/remoteproc/remoteproc*/state | awk '/running/{print NR-1}') && echo stop > /sys/class/remoteproc/remoteproc${RP}/state && echo CM33_Demo_Reto.elf > /sys/class/remoteproc/remoteproc${RP}/firmware && echo start > /sys/class/remoteproc/remoteproc${RP}/state

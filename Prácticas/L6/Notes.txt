@@ -1,0 +1,52 @@
+# Disable demo application at startup 
+systemctl disable weston-graphical-session.service
+reboot
+systemctl restart weston-graphical-session
+
+# Check resolution on display: https://wiki.st.com/stm32mpu/wiki/How_to_display_on_HDMI
+sed -i 's|#mode=1280x720|mode=1280x720|g' /etc/xdg/weston/weston.ini
+sed -i 's|mode=1920x1080|#mode=1920x1080|g' /etc/xdg/weston/weston.ini
+sed -i 's|background-image=/usr/share/weston/backgrounds/ST30739_background-1920x1080.png|#background-image=/usr/share/weston/backgrounds/ST30739_background-1920x1080.png|g' /etc/xdg/weston/weston.ini
+
+# gtk.py
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+from gi.repository import GObject
+from gi.repository import Gdk
+from gi.repository import GLib
+from gi.repository import GdkPixbuf
+from gi.repository import Pango
+import subprocess
+
+class MyWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Hello GTK 3")
+
+        self.maximize()       
+ 
+        # Create a button
+        self.button = Gtk.Button(label="Click Here")
+        self.button.connect("clicked", self.on_button_clicked)
+        
+        # Add the button to the window
+        self.add(self.button)
+
+    def on_button_clicked(self, widget):
+        print("Hello World!")
+        subprocess.run(["aplay", "-D", "plughw:0,0", "/usr/share/sounds/alsa/Front_Center.wav"])
+
+
+win = MyWindow()
+win.set_default_size(1280, 720) 
+win.connect("destroy", Gtk.main_quit) # Close app when window is closed
+win.show_all()
+
+Gtk.main()
+
+
+# Flashing to Cortex-M33 Zephyr blinky example 
+echo stop > /sys/class/remoteproc/remoteproc1/state
+echo "zephyr-blinky.elf" > /sys/class/remoteproc/remoteproc1/firmware
+echo start > /sys/class/remoteproc/remoteproc1/state
+cat /sys/class/remoteproc/remoteproc1/state

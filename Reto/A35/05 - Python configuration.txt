@@ -1,0 +1,33 @@
+## The following method installs required Python libraries for virtual environments on 257F-DK board
+
+##  Pre-requisites
+## 1) Starter-package image flashed on microSD card with re-flashed bootloader
+## 2) SSH/Serial-enabled connection to STM32MP257F-DK board
+## 3) Active connection to Internet 
+
+
+## The following commmands should be entered on the target (257F-DK)system
+
+# Updating repository list and installing required libraries
+apt update && apt install -y python3-pip python3-venv python3-ensurepip python3-tomllib
+
+# Creating virtual environment named 'reto'
+python3 -m venv reto 
+
+# Removing double-parenthesis naming scheme from virtual environment prompt
+sed -E -i "s/PS1=\"\(\"'\(([^)]*)\) '\"\)/PS1=\"(\1)/" reto/bin/activate
+
+# Activating virtual environment
+source reto/bin/activate
+
+# Upgrading Python Installer Package
+pip install --upgrade pip
+
+# Installing libraries to use for showing GPS coordinates on map
+pip install staticmap Pillow
+
+# Exiting Python virtual environment
+deactivate
+
+# Allowing virtual environment to use libraries only found on the system. This is required to use default GTK libraries and this lines should be executed after installing any additional libraries
+sed -i 's/include-system-site-packages = false/include-system-site-packages = true/' reto/pyvenv.cfg

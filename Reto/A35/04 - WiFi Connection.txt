@@ -1,0 +1,60 @@
+## The following method connects the STM32MP257F-DK board to wireless network 
+
+##  Pre-requisites
+## 1) Starter-package image flashed on microSD card
+## 2) SSH-enabled connection to STM32MP257F-DK board
+## 3) Host system on the same wireless network than target system
+
+## The following commands should be entered on the target (257F-DK) system
+
+
+# Check all available interfaces on the board. Identify the wlan0 one
+ifconfig -a
+
+# Turn on WiFi Adapter
+ifconfig wlan0 up
+
+# Scan available networks SSIDs (names)
+iw dev wlan0 scan | grep SSID
+
+# Another way to check available networks. Bonus: provides setup status
+networkctl --no-pager
+
+# Creating network service file. Copy from the cat line until __EOF__ before entering to terminal.
+cat << __EOF__ >> /lib/systemd/network/51-wireless.network
+[Match]
+Name=wlan0
+[Network]
+DHCP=ipv4
+
+__EOF__
+
+# Creating network configuration file. Copy from the cat line until __EOF__ before entering to terminal.
+mkdir -p /etc/wpa_supplicant/
+cat << __EOF__ >> /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+ctrl_interface=/var/run/wpa_supplicant
+eapol_version=1
+ap_scan=1
+fast_reauth=1
+
+__EOF__
+
+# Adding network credentials. In this case, Windows Mobile Hotspot is used but should be the same procedure to any 2.4 GHz WiFi network.
+wpa_passphrase "NETWORK_NAME" "PASSWORD" >> /etc/wpa_supplicant/wpa_supplicant-wlan0.conf
+
+# Enables and starts all the previously configured services
+systemctl enable wpa_supplicant@wlan0.service && systemctl restart systemd-networkd.service && systemctl restart wpa_supplicant@wlan0.service
+
+# Re-starting target system
+reboot
+
+# Verify that wlan0 interface has an IP. 
+ifconfig wlan0
+
+
+## The following commands should be entered on the host (PC) system
+
+# Logging to the board via SSH with the previous wlan0 IP
+ssh root@<wlan0-ip>
+
+## If wireless connection is successful, USB-over-Ethernet cable can be safely unplugged

@@ -1,0 +1,44 @@
+## The following method applies changes on the target board to re-direct CN5 connector from the A35 MPU to the CM33 MCU 
+
+
+##  Pre-requisites
+## 1) Starter-package image flashed on microSD card
+## 2) SSH-enabled connection to STM32MP257F-DK board
+## 3) All files on current folder downloaded locally. Next steps under host consider terminal is located on that folder.
+
+
+## The following commmands should be entered on the host (PC)system
+
+# Copying required files from host to target board
+scp fip-stm32mp257f-dk-optee-sdcard.bin root@192.168.7.1:/tmp/
+scp stm32mp257f-dk.dtb root@192.168.7.1:/boot/
+
+
+## The following commands should be entered on the target (257F-DK) system
+
+# Saving on SD_DRIVE variable partition to overwrite 
+SD_DRIVE=$(lsblk -no PKNAME $(findmnt -n -o SOURCE /))
+
+# Displaying message on terminal
+echo "Flashing to SD card at /dev/${SD_DRIVE}..."
+
+# Overwriting bootloader partition with new image 
+dd if=/tmp/fip-stm32mp257f-dk-optee-sdcard.bin of=/dev/${SD_DRIVE}p5 bs=1M conv=fsync
+
+# Overwriting backup bootloader partition with new image 
+dd if=/tmp/fip-stm32mp257f-dk-optee-sdcard.bin of=/dev/${SD_DRIVE}p6 bs=1M conv=fsync
+
+# Waiting for remaining data to be transferred
+sync
+
+# Re-starting target system
+reboot
+
+
+## After reboot, the following commands should return an error since pin PZ8 has been re-directioned from A35 to CM33
+
+# Setting PZ8 to HIGH
+gpioset -c gpiochip9 8=1 
+# Enter <CTRL>+C to interrupt execution
+# Getting PZ8 logical level
+gpioget -c gpiochip9 8
