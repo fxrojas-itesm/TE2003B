@@ -1,0 +1,36 @@
+journalctl -u weston-checkgpu.service -b --no-pager
+cat /sys/class/drm/card0-HDMI-A-1/status
+cat /sys/class/drm/card0-HDMI-A-1/modes
+cat /sys/class/drm/card0-HDMI-A-1/edid | hexdump -C | head -40
+modetest -c
+modetest -p
+modetest -M stm -s 32@41:1280x720-60 
+systemctl restart weston-graphical-session.service
+	
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0171
+[BME280]:       T=022.7400, P=076.7714
+
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0172
+[BME280]:       T=022.7400, P=076.7714
+
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0171
+[BME280]:       T=022.7400, P=076.7714
+
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0173
+[BME280]:       T=022.7400, P=076.7714
+
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0172
+[BME280]:       T=022.7400, P=076.7714
+
+[NEO6MV2]:      X=49.4571, Y=-89.1873, Z=2248.5
+[VL53L0X]:      D=0171
+[BME280]:       T=022.7400, P=076.7714
+
+apt update && apt install python3-opencv
+
+RP=$(cat /sys/class/remoteproc/remoteproc*/state | awk '/running/{print NR-1}') && echo stop > /sys/class/remoteproc/remoteproc${RP}/state && echo zephyr-reto.elf > /sys/class/remoteproc/remoteproc${RP}/firmware && echo start > /sys/class/remoteproc/remoteproc${RP}/state && python3 a35-reto.py

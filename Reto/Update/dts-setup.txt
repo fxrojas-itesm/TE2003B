@@ -1,0 +1,303 @@
+# Ensure stm32mp25x-ecosystem is extracted
+
+# SDK Setup
+/mnt/nvme1n1p2/Tools/STM/stm32mp25x-ecosystem/Developer-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sdk/st-image-weston-openstlinux-weston-stm32mp2.rootfs-x86_64-toolchain-5.0.15-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18.sh -d /mnt/nvme1n1p2/Tools/STM/stm32mp25x-ecosystem/Developer-Package/SDK
+. /mnt/nvme1n1p2/Tools/STM/stm32mp25x-ecosystem/Developer-Package/SDK/environment-setup-cortexa35-ostl-linux
+
+# Disable demo application at startup 
+systemctl disable weston-graphical-session.service
+reboot
+systemctl restart weston-graphical-session
+
+# Check resolution on display: https://wiki.st.com/stm32mpu/wiki/How_to_display_on_HDMI
+sed -i 's|#mode=1280x720|mode=1280x720|g' /etc/xdg/weston/weston.ini
+sed -i 's|mode=1920x1080|#mode=1920x1080|g' /etc/xdg/weston/weston.ini
+sed -i 's|background-image=/usr/share/weston/backgrounds/ST30739_background-1920x1080.png|#background-image=/usr/share/weston/backgrounds/ST30739_background-1920x1080.png|g' /etc/xdg/weston/weston.ini
+
+# gtk.py
+import gi
+gi.require_version('Gtk', '3.0')
+from gi.repository import Gtk
+from gi.repository import GObject
+from gi.repository import Gdk
+from gi.repository import GLib
+from gi.repository import GdkPixbuf
+from gi.repository import Pango
+import subprocess
+
+class MyWindow(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Hello GTK 3")
+
+        self.maximize()       
+ 
+        # Create a button
+        self.button = Gtk.Button(label="Click Here")
+        self.button.connect("clicked", self.on_button_clicked)
+        
+        # Add the button to the window
+        self.add(self.button)
+
+    def on_button_clicked(self, widget):
+        print("Hello World!")
+        subprocess.run(["aplay", "-D", "plughw:0,0", "/usr/share/sounds/alsa/Front_Center.wav"])
+
+
+win = MyWindow()
+win.set_default_size(1280, 720) 
+win.connect("destroy", Gtk.main_quit) # Close app when window is closed
+win.show_all()
+
+Gtk.main()
+
+# In /mnt/nvme1n1p2/Tools/zephyr/workspaces/stm32/deps/modules/hal/libmetal/libmetal/lib/config.h comment out #cmakedefine HAVE_STDATOMIC_H
+
+
+# Flashing to Cortex-M33 Zephyr blinky example 
+PC>   scp zephyr_openamp_rsc_table.elf root@192.168.1.1:/lib/firmware/
+257F> cat /sys/class/remoteproc/remoteproc0/state
+257F> echo stop > /sys/class/remoteproc/remoteproc0/state
+257F> echo zephyr_openamp_rsc_table.elf > /sys/class/remoteproc/remoteproc0/firmware
+257F> echo start > /sys/class/remoteproc/remoteproc0/state
+257F> cat /sys/class/remoteproc/remoteproc0/state
+
+echo stop > /sys/class/remoteproc/remoteproc0/state && echo zephyr_openamp_rsc_table.elf > /sys/class/remoteproc/remoteproc0/firmware && echo start > /sys/class/remoteproc/remoteproc0/state
+
+
+
+
+mkdir -p /mnt/nvme1n1p2/Tools/STM
+tar -xaf /mnt/sda1/Tools/STM/stm32mp25x.tar.xz --directory=/mnt/nvme1n1p2/Tools/STM
+. /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Developer-Package/SDK/environment-setup-cortexa35-ostl-linux
+
+mkdir -p /mnt/nvme1n1p2/workspace/stm32mp257f-dk/dt-build
+cd /mnt/nvme1n1p2/workspace/stm32mp257f-dk/dt-build
+export WORKDIR=${PWD}
+cp -rp /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Developer-Package/stm32mp-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sources/ ${WORKDIR}
+# Generate <CubeMX_DeviceTree> project under ${WORKDIR} folder
+export CUBEMX_PRJ_NAME=te2003b-dflt
+export EXTDT_DIR=${WORKDIR}/${CUBEMX_PRJ_NAME}
+export FWDDR_DIR=${WORKDIR}/sources/ostl-linux/stm32mp-ddr-phy-*
+mkdir -p FIP_artifacts
+export FIP_DEPLOYDIR_ROOT=${WORKDIR}/FIP_artifacts
+
+mkdir -p kernel
+tar xf sources/ostl-linux/linux-stm32mp-*/linux-*.tar.xz --directory=kernel
+mv kernel/linux-* kernel/kernel-sources/
+pushd kernel/kernel-sources/
+for p in $(ls -1 ../../sources/ostl-linux/linux-stm32mp-*/*.patch); do patch -p1 < $p; done
+popd
+pushd $WORKDIR/kernel/kernel-sources
+export OUTPUT_BUILD_DIR=$PWD/../build
+mkdir -p ${OUTPUT_BUILD_DIR}
+make -j$(nproc) O="${OUTPUT_BUILD_DIR}" defconfig fragment*.config
+for f in `ls -1 ../../sources/ostl-linux/linux-stm32mp-*/fragment*.config`; do scripts/kconfig/merge_config.sh -m -r -O ${OUTPUT_BUILD_DIR} ${OUTPUT_BUILD_DIR}/.config $f; done
+(yes "" || true ) | make -j$(nproc) oldconfig O="${OUTPUT_BUILD_DIR}"
+make -j$(nproc) O="${OUTPUT_BUILD_DIR}" KBUILD_EXTDTS="${EXTDT_DIR}/CA35/DeviceTree/${CUBEMX_PRJ_NAME}/kernel" dtbs
+ls -l ${OUTPUT_BUILD_DIR}/arch/${ARCH}/boot/dts/st/stm32mp257f-${CUBEMX_PRJ_NAME}-mx.dtb
+popd
+
+pushd sources/ostl-linux/tf-a-stm32mp-v[0-9]*
+mkdir -p tf-a-sources
+tar xf tf-a-stm32mp-v[0-9]*.tar.* --one-top-level=tf-a-sources --strip-components=1
+pushd tf-a-sources
+for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+popd
+popd
+pushd $WORKDIR/sources/ostl-linux/tf-a-stm32mp-v[0-9]*/tf-a-sources
+export EXTDT_DIR_TF_A=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/tf-a
+export EXTDT_DIR_TF_A_SERIAL=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/tf-a
+make -j$(nproc) -f ../Makefile.sdk.stm32mp2 DEPLOYDIR=${FIP_DEPLOYDIR_ROOT}/arm-trusted-firmware TF_A_DEVICETREE=stm32mp257f-${CUBEMX_PRJ_NAME}-mx TF_A_CONFIG="optee-sdcard optee-programmer-usb" stm32
+popd
+
+pushd sources/ostl-linux/optee-os-stm32mp-[0-9]*
+tar xf optee-os-stm32mp-[0-9]*.tar.* --one-top-level=optee-os-sources --strip-components=1
+pushd optee-os-sources
+tar xfz ../fonts.tar.gz
+for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+popd
+popd
+pushd $WORKDIR/sources/ostl-linux/optee-os-stm32mp-[0-9]*/optee-os-sources
+mkdir -p core/arch/arm/dts/external-dt/optee && cp ${WORKDIR}/${CUBEMX_PRJ_NAME}/CA35/DeviceTree/te2003b-dflt/optee-os/*dts* ./core/arch/arm/dts/external-dt/optee
+make -f $PWD/../Makefile.sdk.stm32mp2 DEPLOYDIR=$FIP_DEPLOYDIR_ROOT/optee CFG_EMBED_DTB_SOURCE_FILE=stm32mp257f-${CUBEMX_PRJ_NAME}-mx OPTEE_CONFIG="optee-sdcard optee-programmer-usb" EXTDT_DIR= EXTDT_DIR_OPTEE=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/optee-os EXTDT_DIR_OPTEE_SERIAL=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/optee-os optee
+popd
+
+pushd sources/ostl-linux/u-boot-stm32mp-v[0-9]*
+tar xf u-boot-stm32mp-v[0-9]*.tar.* --one-top-level=u-boot-sources --strip-components=1
+pushd u-boot-sources
+for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+popd
+pushd $WORKDIR/sources/ostl-linux/u-boot-stm32mp-v[0-9]*/u-boot-sources
+make -j$(nproc) -f $PWD/../Makefile.sdk.stm32mp2 DEPLOYDIR=$FIP_DEPLOYDIR_ROOT/u-boot UBOOT_DEFCONFIG_default=stm32mp25_defconfig UBOOT_DEFCONFIG_programmer=stm32mp25_defconfig DEVICE_TREE=stm32mp257f-${CUBEMX_PRJ_NAME}-mx EXTDT_DIR=${EXTDT_DIR} EXTDT_DIR_UBOOT=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/u-boot EXTDT_DIR_UBOOT_SERIAL=CA35/DeviceTree/${CUBEMX_PRJ_NAME}/u-boot uboot
+
+export FIP_CONFIG="optee-sdcard optee-programmer-usb"
+export FIP_CONFIG="optee-sdcard optee-programmer-usb"
+export FIP_DEVICETREE=stm32mp257f-${CUBEMX_PRJ_NAME}-mx
+../fiptool-stm32mp.stm32mp2
+popd
+popd
+
+chmod 775 $FIP_DEPLOYDIR_ROOT/arm-trusted-firmware/tf-a-stm32mp257f-${CUBEMX_PRJ_NAME}-*.stm32 && cp $FIP_DEPLOYDIR_ROOT/arm-trusted-firmware/tf-a-stm32mp257f-${CUBEMX_PRJ_NAME}-*.stm32 /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Starter-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2/arm-trusted-firmware/
+chmod 775 $FIP_DEPLOYDIR_ROOT/fip/fip-stm32mp257f-${CUBEMX_PRJ_NAME}-*.bin && cp $FIP_DEPLOYDIR_ROOT/fip/fip-stm32mp257f-${CUBEMX_PRJ_NAME}-*.bin /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Starter-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2/fip/
+pushd /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Starter-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2
+cp flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-optee.tsv flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-${CUBEMX_PRJ_NAME}-optee.tsv
+sed -i 's|tf-a-stm32mp257f-dk-optee-programmer-usb.stm32|tf-a-stm32mp257f-te2003b-dflt-mx-optee-programmer-usb.stm32|g' flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-${CUBEMX_PRJ_NAME}-optee.tsv
+sed -i 's|fip-stm32mp257f-dk-optee-programmer-usb.bin|fip-stm32mp257f-te2003b-dflt-mx-optee-programmer-usb.bin|g' flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-${CUBEMX_PRJ_NAME}-optee.tsv
+sed -i 's|tf-a-stm32mp257f-dk-optee-sdcard.stm32|tf-a-stm32mp257f-te2003b-dflt-mx-optee-sdcard.stm32|g' flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-${CUBEMX_PRJ_NAME}-optee.tsv
+sed -i 's|fip-stm32mp257f-dk-optee-sdcard.bin|fip-stm32mp257f-te2003b-dflt-mx-optee-sdcard.bin|g' flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-${CUBEMX_PRJ_NAME}-optee.tsv
+./scripts/create_sdcard_from_flashlayout.sh flashlayout_st-image-weston/optee/FlashLayout_sdcard_stm32mp257f-dk-te2003b-dflt-optee.tsv
+sudo dd if=FlashLayout_sdcard_stm32mp257f-dk-te2003b-dflt-optee.raw of=/dev/sdb bs=8M conv=fdatasync status=progress; sudo sgdisk /dev/sdb -p; sudo sgdisk /dev/sdb -v; sudo sgdisk /dev/sdb -e
+
+
+
+
+#part 01:     fsbla1, image: arm-trusted-firmware/tf-a-stm32mp257f-dk-optee-sdcard.stm32 
+#part 02:     fsbla2, image: arm-trusted-firmware/tf-a-stm32mp257f-dk-optee-sdcard.stm32 
+#part 03:  metadata1, image: arm-trusted-firmware/metadata.bin 
+#part 04:  metadata2, image: arm-trusted-firmware/metadata.bin 
+#part 05:      fip-a, image: fip/fip-stm32mp257f-dk-optee-sdcard.bin 
+#part 08:     bootfs, image: st-image-weston-openstlinux-weston-stm32mp2.splitted-bootfs.ext4 
+#part 09:   vendorfs, image: st-image-weston-openstlinux-weston-stm32mp2.splitted-vendorfs.ext4 
+#part 10:     rootfs, image: st-image-weston-openstlinux-weston-stm32mp2.splitted-rootfs.ext4 
+#part 11:     userfs, image: st-image-weston-openstlinux-weston-stm32mp2.splitted-userfs.ext4 
+#Number  Start (sector)    End (sector)  Size       Code  Name
+#   1              34             545   256.0 KiB   8301  fsbla1
+#   2             546            1057   256.0 KiB   8301  fsbla2
+#   3            1058            1569   256.0 KiB   FFFF  metadata1
+#   4            1570            2081   256.0 KiB   FFFF  metadata2
+#   5            2082           10273   4.0 MiB     FFFF  fip-a
+#   6           10274           18465   4.0 MiB     FFFF  fip-b
+#   7           18466           19489   512.0 KiB   B000  u-boot-env
+#   8           19490          150561   64.0 MiB    8300  bootfs
+#   9          150562          662561   250.0 MiB   8300  vendorfs
+#  10          662562         9051169   4.0 GiB     8300  rootfs
+#  11         9051170        10065886   495.5 MiB   8300  userfs
+
+sudo dd if=FIP_artifacts/arm-trusted-firmware/tf-a-stm32mp257f-te2003b-dflt-mx-optee-sdcard.stm32 of=/dev/sdb1 bs=1M conv=fdatasync
+sudo dd if=FIP_artifacts/arm-trusted-firmware/tf-a-stm32mp257f-te2003b-dflt-mx-optee-sdcard.stm32 of=/dev/sdb2 bs=1M conv=fdatasync
+sudo dd if=FIP_artifacts/fip/fip-stm32mp257f-te2003b-dflt-mx-optee-sdcard.bin of=/dev/sdb5 bs=1M conv=fdatasync
+sudo dd if=FIP_artifacts/fip/fip-stm32mp257f-te2003b-dflt-mx-optee-sdcard.bin of=/dev/sdb6 bs=1M conv=fdatasync
+sudo cp ${OUTPUT_BUILD_DIR}/arch/arm64/boot/dts/st/stm32mp257f-${CUBEMX_PRJ_NAME}-mx.dtb /media/${USER}/bootfs/
+sudo umount /media/${USER}/bootfs/
+sync
+
+
+
+
+
+
+
+
+
+
+
+
+. /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Developer-Package/SDK/environment-setup-cortexa35-ostl-linux
+mkdir -p /mnt/nvme1n1p2/workspace/stm32mp257f-dk/dt-build1
+cd /mnt/nvme1n1p2/workspace/stm32mp257f-dk/dt-build1
+export WORKDIR=${PWD}
+cp -rp /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Developer-Package/stm32mp-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/sources/ ${WORKDIR}
+
+pushd sources/ostl-linux/optee-os-stm32mp-[0-9]*
+tar xf optee-os-stm32mp-[0-9]*.tar.* --one-top-level=optee-os-sources --strip-components=1
+pushd optee-os-sources
+tar xfz ../fonts.tar.gz
+for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+popd
+popd
+
+pushd $WORKDIR/sources/ostl-linux/optee-os-stm32mp-[0-9]*/optee-os-sources
+sed -i '/&rifsc/,/}/ { s|STM32MP25_RIFSC_USART6_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|STM32MP25_RIFSC_USART6_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&rifsc/,/}/ { s|STM32MP25_RIFSC_SPI6_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|STM32MP25_RIFSC_SPI6_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&rifsc/,/}/ { s|STM32MP25_RIFSC_I2C8_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|STM32MP25_RIFSC_I2C8_ID, RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioc/,/}/ { s|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioc/,/}/ { s|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpiof/,/}/ { s|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpiof/,/}/ { s|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpiof/,/}/ { s|RIF_IOPORT_PIN(13), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(13), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpiof/,/}/ { s|RIF_IOPORT_PIN(14), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(14), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(0), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(0), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(1), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(1), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(3), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(3), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(4), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(5), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(5), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(6), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(6), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(7), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(8), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(8), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+sed -i '/&gpioz/,/}/ { s|RIF_IOPORT_PIN(9), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_NPRIV, RIF_UNUSED, RIF_SEM_DIS, RIF_CFDIS|RIF_IOPORT_PIN(9), RIF_UNUSED, RIF_UNLOCK, RIF_NSEC, RIF_PRIV, RIF_CID2, RIF_SEM_DIS, RIF_CFEN| }' "${PWD}/core/arch/arm/dts/stm32mp257f-dk-ca35tdcid-rif.dtsi"
+make -j$(nproc) -f $PWD/../Makefile.sdk.stm32mp2 all
+popd
+
+pushd $WORKDIR/sources/ostl-linux/linux-stm32mp-6.6.116-stm32mp-r3-r0/
+tar xf linux-[0-9]*.tar.* --one-top-level=kernel-sources --strip-components=1
+pushd kernel-sources/
+for p in $(ls -1 ../*.patch); do patch -p1 < $p; done
+popd
+popd
+
+pushd $WORKDIR/sources/ostl-linux/linux-stm32mp-6.6.116-stm32mp-r3-r0/kernel-sources
+export OUTPUT_BUILD_DIR=$PWD/../build
+mkdir -p ${OUTPUT_BUILD_DIR}
+make -j$(nproc) O="${OUTPUT_BUILD_DIR}" defconfig fragment*.config
+for f in `ls -1 ../fragment*.config`; do scripts/kconfig/merge_config.sh -m -r -O ${OUTPUT_BUILD_DIR} ${OUTPUT_BUILD_DIR}/.config $f; done
+(yes "" || true ) | make -j$(nproc) oldconfig O="${OUTPUT_BUILD_DIR}"
+vim arch/arm64/boot/dts/st/stm32mp257f-dk.dts
+make -j$(nproc) O="${OUTPUT_BUILD_DIR}" dtbs
+popd
+
+# pushd sources/ostl-linux/tf-a-stm32mp-v[0-9]*
+# mkdir -p tf-a-sources
+# tar xf tf-a-stm32mp-v[0-9]*.tar.* --one-top-level=tf-a-sources --strip-components=1
+# pushd tf-a-sources
+# for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+# popd
+# popd
+
+# pushd $WORKDIR/sources/ostl-linux/tf-a-stm32mp-v[0-9]*/tf-a-sources
+# make -j$(nproc) DEPLOYDIR=$FIP_DEPLOYDIR_ROOT -f $PWD/../Makefile.sdk.stm32mp2 all
+# popd
+
+# pushd sources/ostl-linux/u-boot-stm32mp-v[0-9]*
+# tar xf u-boot-stm32mp-v[0-9]*.tar.* --one-top-level=u-boot-sources --strip-components=1
+# pushd u-boot-sources
+# for p in `ls -1 ../*.patch`; do patch -p1 < $p; done
+# popd
+# popd
+
+# pushd $WORKDIR/sources/ostl-linux/u-boot-stm32mp-v[0-9]*/u-boot-sources
+# make -j$(nproc) DEPLOYDIR=$FIP_DEPLOYDIR_ROOT -f $PWD/../Makefile.sdk.stm32mp2 all
+# popd
+
+pushd sources/ostl-linux/optee-os-stm32mp-4.0.0-stm32mp-r3-r0/deploy/
+cp -f /mnt/nvme1n1p2/Tools/STM/stm32mp25x/Starter-Package/stm32mp2-openstlinux-6.6-yocto-scarthgap-mpu-v26.02.18/images/stm32mp2/fip/fip-stm32mp257f-dk-optee-sdcard.bin .
+fiptool update --tos-fw tee-header_v2-stm32mp257f-dk-optee.bin   --tos-fw-extra1 tee-pager_v2-stm32mp257f-dk-optee.bin --tos-fw-extra2 tee-pageable_v2-stm32mp257f-dk-optee.bin fip-stm32mp257f-dk-optee-sdcard.bin
+scp fip-stm32mp257f-dk-optee-sdcard.bin root@192.168.7.1:/tmp/
+popd
+
+pushd sources/ostl-linux/linux-stm32mp-6.6.116-stm32mp-r3-r0/build/
+scp arch/arm64/boot/dts/st/stm32mp257f-dk.dtb root@192.168.7.1:/boot/
+popd
+
+# On target:
+
+SD_DRIVE=$(lsblk -no PKNAME $(findmnt -n -o SOURCE /))
+echo "Flashing to SD card at /dev/${SD_DRIVE}..."
+dd if=/tmp/fip-stm32mp257f-dk-optee-sdcard.bin of=/dev/${SD_DRIVE}p5 bs=1M conv=fsync
+dd if=/tmp/fip-stm32mp257f-dk-optee-sdcard.bin of=/dev/${SD_DRIVE}p6 bs=1M conv=fsync
+sync
+reboot
+
+# Verify RIF is working
+killall gpioset
+gpioset -c gpiochip9 8=0 
+# <CTRL>+C
+gpioget -c gpiochip9 8
+
+
+# sudo dd if=if=FlashLayout_sdcard_stm32mp257f-dk-optee.raw of=/dev/sdb bs=8M conv=fdatasync status=progress; sudo sgdisk /dev/sdb -p; sudo sgdisk /dev/sdb -v; sudo sgdisk /dev/sdb -e
+
+
+
+
+
+
