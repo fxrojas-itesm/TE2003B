@@ -1,0 +1,31 @@
+## En las líneas 26 y 28 reemplazar por los archivos .elf y .py correspondientes
+  
+systemctl enable edid-inject.service
+systemctl disable weston-edid-restart.service
+sed -i 's|DEFAULT_DEMO_APPLICATION_GTK=/usr/local/demo/launch-demo-gtk.sh|#DEFAULT_DEMO_APPLICATION_GTK=/usr/local/demo/launch-demo-gtk.sh|g' /usr/local/weston-start-at-startup/start_up_demo_launcher.sh
+cat << __EOF__ > /etc/systemd/system/reto.service
+[Unit]
+Description=Inicia programa de reto
+After=weston-graphical-session.service
+
+[Service]
+ExecStart=/home/root/reto-start.sh
+
+[Install]
+WantedBy=multi-user.target
+
+__EOF__
+cat << '__EOF__' > /home/root/reto-start.sh
+#!/usr/bin/sh
+
+. /etc/profile.d/weston_profile.sh
+
+RP=$(cat /sys/class/remoteproc/remoteproc*/state | awk '/running/{print NR-1}')
+echo stop > /sys/class/remoteproc/remoteproc${RP}/state 
+echo zephyr-reto-simulador.elf > /sys/class/remoteproc/remoteproc${RP}/firmware 
+echo start > /sys/class/remoteproc/remoteproc${RP}/state 
+/usr/bin/python3 /home/root/a35-reto-gtk.py
+
+__EOF__
+chmod +x /home/root/reto-start.sh
+reboot
