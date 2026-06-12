@@ -1,5 +1,5 @@
-## En las líneas 26 y 28 reemplazar por los archivos .elf y .py correspondientes
-  
+## En las líneas 25 y 27 reemplazar por los archivos .elf y .py correspondientes
+
 systemctl enable edid-inject.service
 systemctl disable weston-edid-restart.service
 sed -i 's|DEFAULT_DEMO_APPLICATION_GTK=/usr/local/demo/launch-demo-gtk.sh|#DEFAULT_DEMO_APPLICATION_GTK=/usr/local/demo/launch-demo-gtk.sh|g' /usr/local/weston-start-at-startup/start_up_demo_launcher.sh
